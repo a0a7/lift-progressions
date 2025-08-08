@@ -22,7 +22,9 @@ async function syncGarmin() {
   }
   syncing = false;
 }
-  import { onMount } from 'svelte';
+  import { onMount, afterUpdate, onDestroy } from 'svelte';
+  import Chart from 'chart.js/auto';
+  import 'chartjs-adapter-date-fns';
 
   type ExerciseSet = {
     exercise_name: string;
@@ -52,18 +54,18 @@ async function syncGarmin() {
 
 let activities: Activity[] = [];
 let selectedLifts = [
-  'INCLINE_SMITH_MACHINE_BENCH_PRESS',
-  'FLYE',
-  'LATERAL_RAISE',
-  'SEATED_REAR_LATERAL_RAISE',
-  'EZ_BAR_PREACHER_CURL',
-  'REVERSE_EZ_BAR_CURL',
-  'TRICEPS_PRESSDOWN',
-  'CLOSE_GRIP_LAT_PULLDOWN',
-  'BARBELL_HACK_SQUAT',
-  'WEIGHTED_LEG_EXTENSIONS',
-  'WEIGHTED_LEG_CURL',
-  'WEIGHTED_CRUNCH'
+    'INCLINE_SMITH_MACHINE_BENCH_PRESS',
+    'FLYE',
+    'EZ_BAR_PREACHER_CURL',
+    'REVERSE_EZ_BAR_CURL',
+    'TRICEPS_PRESSDOWN',
+    'LATERAL_RAISE',
+    'SEATED_REAR_LATERAL_RAISE',
+    'CLOSE_GRIP_LAT_PULLDOWN',
+    'WEIGHTED_CRUNCH',
+    'WEIGHTED_LEG_CURL',
+    'WEIGHTED_LEG_EXTENSIONS',
+    'BARBELL_HACK_SQUAT',
 ]
 let results: Record<string, LiftSummary[]> = {};
 
@@ -229,6 +231,122 @@ function getWeightMultiplier(lift: string, date: string): number {
       });
     }
   });
+
+let chartInstances: Record<string, Chart> = {};
+let trendlineEquations: Record<string, string> = {};
+
+  function get12MonthData(lift: string) {
+    const now = new Date();
+    const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    return (results[lift] || []).filter(row => {
+      const d = new Date(row[0] + 'T00:00:00');
+      return d >= yearAgo && d <= now;
+    });
+  }
+
+function getTrendline(data: {x: number, y: number}[], lift?: string) {
+  if (data.length < 2) {
+    if (lift) trendlineEquations[lift] = '';
+    return [];
+  }
+  const n = data.length;
+  const sumX = data.reduce((a, p) => a + p.x, 0);
+  const sumY = data.reduce((a, p) => a + p.y, 0);
+  const sumXY = data.reduce((a, p) => a + p.x * p.y, 0);
+  const sumXX = data.reduce((a, p) => a + p.x * p.x, 0);
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  // Calculate R^2
+  const meanY = sumY / n;
+  let ssTot = 0, ssRes = 0;
+  for (const p of data) {
+    const yPred = slope * p.x + intercept;
+    ssTot += (p.y - meanY) ** 2;
+    ssRes += (p.y - yPred) ** 2;
+  }
+  const r2 = ssTot === 0 ? 1 : 1 - ssRes / ssTot;
+  // Show slope per 30 days (month)
+  const slopePerMonth = slope * 86400000 * 30;
+  if (lift) {
+    trendlineEquations[lift] = `a = ${slopePerMonth.toFixed(2)} /mo, R² = ${r2.toFixed(2)}`;
+  }
+  const x0 = data[0].x;
+  const x1 = data[data.length - 1].x;
+  return [
+    { x: x0, y: slope * x0 + intercept },
+    { x: x1, y: slope * x1 + intercept }
+  ];
+}
+
+  afterUpdate(() => {
+    for (const lift of selectedLifts) {
+      const canvas = document.getElementById('chart-' + lift) as HTMLCanvasElement;
+      if (!canvas) continue;
+      if (chartInstances[lift]) {
+        chartInstances[lift].destroy();
+        delete chartInstances[lift];
+      }
+      const dataRows = get12MonthData(lift);
+      if (dataRows.length === 0) {
+        trendlineEquations[lift] = '';
+        continue;
+      }
+      const points = dataRows.map(row => ({
+        x: new Date(row[0] + 'T00:00:00').getTime(),
+        y: row[8]
+      }));
+      const trend = getTrendline(points, lift);
+      chartInstances[lift] = new Chart(canvas, {
+        type: 'scatter',
+        data: {
+          datasets: [
+            {
+              label: '6RM',
+              data: points,
+              backgroundColor: '#2563eb',
+              pointRadius: 3,
+            },
+            ...(trend.length === 2
+              ? [{
+                  type: 'line' as const,
+                  label: 'Trend',
+                  data: trend,
+                  borderColor: '#f59e42',
+                  borderWidth: 2,
+                  fill: false,
+                  pointRadius: 0,
+                  tension: 0,
+                  order: 1,
+                }]
+              : [])
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            title: { display: false }
+          },
+          scales: {
+            x: {
+              type: 'time',
+              time: { unit: 'month' },
+              title: { display: true, text: 'Date' }
+            },
+            y: {
+              title: { display: true, text: '6RM' },
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+  });
+
+  onDestroy(() => {
+    for (const k in chartInstances) chartInstances[k].destroy();
+  });
 </script>
 
 
@@ -245,7 +363,7 @@ function getWeightMultiplier(lift: string, date: string): number {
     {/if}
   </div>
 </div>
-
+<div class="w-full max-w-full overflow-x-scroll">
 <table class="w-full text-sm mb-6 border">
   <thead>
     <tr class="bg-gray-200">
@@ -302,6 +420,21 @@ function getWeightMultiplier(lift: string, date: string): number {
     </tr>
   </tbody>
 </table>
+</div>
+<div class="flex w-full max-w-full overflow-x-scroll">
+{#each Object.entries(results) as [lift, entries]}
+    <div class="flex flex-wrap px-2 mt-8">
+        <h3 class="text-base font-semibold mb-1">{liftNames[lift] || lift}</h3>
+        {#if trendlineEquations[lift]}
+          <div class="text-xs mb-2 text-gray-600">{trendlineEquations[lift]}</div>
+        {/if}
+        <div style="height:260px;width:100%">
+          <canvas id={'chart-' + lift}></canvas>
+        </div>
+    </div>
+{/each}
+</div>
+
 
 {#each Object.entries(results) as [lift, entries]}
   <details class="mb-4">
@@ -332,3 +465,4 @@ function getWeightMultiplier(lift: string, date: string): number {
     </table>
   </details>
 {/each}
+
