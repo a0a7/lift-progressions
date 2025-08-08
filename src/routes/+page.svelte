@@ -1,22 +1,27 @@
 <script lang="ts">
-  let syncing = false;
-  let syncMessage = '';
+let syncing = false;
+let syncMessage = '';
+let syncRawResponse: string | null = null;
 
-  async function syncGarmin() {
-    syncing = true;
-    syncMessage = '';
-    try {
-      const res = await fetch('https://garmin-sync-worker.lev-s-cloudflare.workers.dev/sync');
-      if (res.ok) {
-        syncMessage = 'Sync request sent!';
-      } else {
-        syncMessage = 'Sync failed: ' + res.status;
-      }
-    } catch (e) {
-      syncMessage = 'Sync error: ' + e;
+async function syncGarmin() {
+  syncing = true;
+  syncMessage = '';
+  syncRawResponse = null;
+  try {
+    const res = await fetch('https://garmin-sync-worker.lev-s-cloudflare.workers.dev/sync');
+    const text = await res.text();
+    syncRawResponse = text;
+    if (res.ok) {
+      syncMessage = 'Sync request sent!';
+    } else {
+      syncMessage = 'Sync failed: ' + res.status;
     }
-    syncing = false;
+  } catch (e) {
+    syncMessage = 'Sync error: ' + e;
+    syncRawResponse = null;
   }
+  syncing = false;
+}
   import { onMount } from 'svelte';
 
   type ExerciseSet = {
@@ -231,9 +236,14 @@ function getWeightMultiplier(lift: string, date: string): number {
   <button class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 cursor-pointer disabled:opacity-50" on:click={syncGarmin} disabled={syncing}>
     {syncing ? 'Syncing...' : 'Sync Garmin'}
   </button>
-  {#if syncMessage}
-    <span class="text-sm">{syncMessage}</span>
-  {/if}
+  <div class="flex-1 min-w-0">
+    {#if syncMessage}
+      <span class="text-sm block">{syncMessage}</span>
+    {/if}
+    {#if syncRawResponse !== null}
+      <pre class="text-xs bg-gray-100 rounded p-2 mt-1 overflow-x-auto max-w-full whitespace-pre-wrap">{syncRawResponse}</pre>
+    {/if}
+  </div>
 </div>
 
 <table class="w-full text-sm mb-6 border">
