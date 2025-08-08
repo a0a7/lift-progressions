@@ -1,4 +1,22 @@
 <script lang="ts">
+  let syncing = false;
+  let syncMessage = '';
+
+  async function syncGarmin() {
+    syncing = true;
+    syncMessage = '';
+    try {
+      const res = await fetch('https://garmin-sync-worker.lev-s-cloudflare.workers.dev/sync');
+      if (res.ok) {
+        syncMessage = 'Sync request sent!';
+      } else {
+        syncMessage = 'Sync failed: ' + res.status;
+      }
+    } catch (e) {
+      syncMessage = 'Sync error: ' + e;
+    }
+    syncing = false;
+  }
   import { onMount } from 'svelte';
 
   type ExerciseSet = {
@@ -37,7 +55,6 @@ let selectedLifts = [
   'REVERSE_EZ_BAR_CURL',
   'TRICEPS_PRESSDOWN',
   'CLOSE_GRIP_LAT_PULLDOWN',
-  'SEATED_CABLE_ROW',
   'BARBELL_HACK_SQUAT',
   'WEIGHTED_LEG_EXTENSIONS',
   'WEIGHTED_LEG_CURL',
@@ -56,6 +73,22 @@ let summaryTable: Array<{
   raw_increase_6mo: number;
   pct_increase_6mo: number;
 }> = [];
+
+// User-readable names for each exercise
+const liftNames: Record<string, string> = {
+  'INCLINE_SMITH_MACHINE_BENCH_PRESS': 'Incline Smith Bench',
+  'FLYE': 'Chest Fly',
+  'LATERAL_RAISE': 'Lateral Raise',
+  'SEATED_REAR_LATERAL_RAISE': 'Reverse Fly',
+  'EZ_BAR_PREACHER_CURL': 'Preacher Curl',
+  'REVERSE_EZ_BAR_CURL': 'Reverse Curl',
+  'TRICEPS_PRESSDOWN': 'Triceps Pushdown',
+  'CLOSE_GRIP_LAT_PULLDOWN': 'Close Grip Lat Pulldown',
+  'BARBELL_HACK_SQUAT': 'Barbell Hack Squat',
+  'WEIGHTED_LEG_EXTENSIONS': 'Leg Extension',
+  'WEIGHTED_LEG_CURL': 'Leg Curl',
+  'WEIGHTED_CRUNCH': 'Weighted Crunch',
+};
 
 // Weight multipliers for specific lifts between specific dates
 // Each entry: { lift: string, start: string (YYYY-MM-DD), end: string (YYYY-MM-DD), multiplier: number }
@@ -194,50 +227,75 @@ function getWeightMultiplier(lift: string, date: string): number {
 </script>
 
 
+<div class="mb-4 flex items-center gap-4">
+  <button class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 cursor-pointer disabled:opacity-50" on:click={syncGarmin} disabled={syncing}>
+    {syncing ? 'Syncing...' : 'Sync Garmin'}
+  </button>
+  {#if syncMessage}
+    <span class="text-sm">{syncMessage}</span>
+  {/if}
+</div>
+
 <table class="w-full text-sm mb-6 border">
   <thead>
     <tr class="bg-gray-200">
-      <th class="border px-2 py-1">Lift</th>
-      <th class="border px-2 py-1">6RM Avg<br>Last 2w</th>
-      <!--<th class="border px-2 py-1">6RM Avg<br>Prev 2w</th>
-      <th class="border px-2 py-1">Raw Δ</th>-->
-      <th class="border px-2 py-1">2-wk Δ</th>
-        <th class="border px-2 py-1">6mo % Δ</th>
-        <th class="border px-2 py-1">6mo Raw Δ</th>
-      <th class="border px-2 py-1">6RM Avg<br>6mo Ago</th>
+      <th class="border px-14 py-1">Metric</th>
+      {#each summaryTable as row}
+        <th class="border px-2 py-1" title={liftNames[row.lift] || row.lift}>
+          {liftNames[row.lift] || row.lift}
+        </th>
+      {/each}
     </tr>
   </thead>
   <tbody>
-    {#each summaryTable as row}
-      <tr>
-        <td class="border px-2 py-1">{row.lift}</td>
-        <td class="border px-2 py-1 text-center fold-bold">{row.avg6RM_recent.toFixed(0)}</td>
-        <!--<td class="border px-2 py-1 text-center">{row.avg6RM_prev.toFixed(2)}</td>
-        <td class="border px-2 py-1 text-center">{row.raw_increase.toFixed(2)}</td>-->
+    <tr>
+      <td class="border px-2 py-1 font-semibold">6RM Avg Last 2w</td>
+      {#each summaryTable as row}
+        <td class="border px-2 py-1 text-center font-bold">{row.avg6RM_recent.toFixed(0)}</td>
+      {/each}
+    </tr>
+    <tr>
+      <td class="border px-2 py-1 font-semibold">2-wk Δ%</td>
+      {#each summaryTable as row}
         <td class="border px-2 py-1 text-center">
           <span class={row.pct_increase > 0 ? 'text-green-600 font-bold' : row.pct_increase < 0 ? 'text-red-600 font-semibold' : ''}>
             {row.pct_increase.toFixed(1)}%
           </span>
         </td>
+      {/each}
+    </tr>
+    <tr>
+      <td class="border px-2 py-1 font-semibold">6mo Δ%</td>
+      {#each summaryTable as row}
         <td class="border px-2 py-1 text-center">
           <span class={row.pct_increase_6mo > 0 ? 'text-green-600 font-bold' : row.pct_increase_6mo < 0 ? 'text-red-600 font-semibold' : ''}>
             {row.pct_increase_6mo.toFixed(1)}%
           </span>
         </td>
+      {/each}
+    </tr>
+    <tr>
+      <td class="border px-2 py-1 font-semibold">6mo Δ</td>
+      {#each summaryTable as row}
         <td class="border px-2 py-1 text-center">
           <span class={row.raw_increase_6mo > 0 ? 'text-green-600 font-bold' : row.raw_increase_6mo < 0 ? 'text-red-600 font-semibold' : ''}>
             {row.raw_increase_6mo.toFixed(2)}
           </span>
         </td>
+      {/each}
+    </tr>
+    <tr>
+      <td class="border px-2 py-1 font-semibold">6RM Avg 6mo Ago</td>
+      {#each summaryTable as row}
         <td class="border px-2 py-1 text-center">{row.avg6RM_6mo_ago.toFixed(0)}</td>
-      </tr>
-    {/each}
+      {/each}
+    </tr>
   </tbody>
 </table>
 
 {#each Object.entries(results) as [lift, entries]}
   <details class="mb-4">
-    <summary class="cursor-pointer font-semibold">{lift}</summary>
+    <summary class="cursor-pointer font-semibold">{liftNames[lift] || lift}</summary>
     <table class="w-full text-sm mt-2 border">
       <thead>
         <tr class="bg-gray-200">
