@@ -43,6 +43,7 @@
 
   let chartInstances: Record<string, Chart> = {};
   let trendlineEquations: Record<string, string> = {};
+  let miniChartInstances: Record<string, Chart> = {};
 
   function getChartData(lift: string) {
     const now = new Date();
@@ -66,6 +67,15 @@
     return (results[lift] || []).filter(row => {
       const d = new Date(row[0] + 'T00:00:00');
       return d >= startDate && d <= now;
+    });
+  }
+
+  function get1YearData(lift: string) {
+    const now = new Date();
+    const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    return (results[lift] || []).filter(row => {
+      const d = new Date(row[0] + 'T00:00:00');
+      return d >= yearAgo && d <= now;
     });
   }
 
@@ -339,6 +349,106 @@
     });
   }
 
+  function createMiniChart(lift: string) {
+    const canvas = document.getElementById('mini-chart-' + lift) as HTMLCanvasElement;
+    if (!canvas) return;
+    
+    // Destroy existing mini chart for this lift
+    if (miniChartInstances[lift]) {
+      miniChartInstances[lift].destroy();
+      delete miniChartInstances[lift];
+    }
+    
+    const dataRows = get1YearData(lift);
+    if (dataRows.length === 0) return;
+    
+    const points = dataRows.map(row => ({
+      x: new Date(row[0] + 'T00:00:00').getTime(),
+      y: row[8]
+    }));
+    
+    const movingAvg = calculateMovingAverage(points, 30);
+    const trend = getTrendline(points);
+    
+    miniChartInstances[lift] = new Chart(canvas, {
+      type: 'scatter',
+      data: {
+        datasets: [
+          {
+            label: '6RM',
+            data: points,
+            backgroundColor: 'rgba(99, 102, 241, 0.4)',
+            borderColor: 'rgba(99, 102, 241, 0.6)',
+            pointRadius: 2,
+            pointHoverRadius: 3,
+          },
+          {
+            type: 'line' as const,
+            label: 'MA',
+            data: movingAvg,
+            borderColor: 'rgba(99, 102, 241, 0.8)',
+            backgroundColor: 'transparent',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.3,
+          },
+          ...(trend.length === 2
+            ? [{
+                type: 'line' as const,
+                label: 'Trend',
+                data: trend,
+                borderColor: 'rgba(99, 102, 241, 1)',
+                borderWidth: 1.5,
+                borderDash: [4, 2],
+                fill: false,
+                pointRadius: 0,
+                tension: 0,
+              }]
+            : [])
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          title: { display: false },
+          tooltip: { enabled: false }
+        },
+        scales: {
+          x: {
+            type: 'time',
+            display: false
+          },
+          y: {
+            display: true,
+            beginAtZero: false,
+            ticks: {
+              font: {
+                size: 9
+              }
+            },
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
+            }
+          }
+        },
+        onClick: () => {
+          selectedLift = lift;
+        }
+      }
+    });
+  }
+
+  function updateMiniCharts() {
+    selectedLifts.forEach(lift => {
+      setTimeout(() => {
+        createMiniChart(lift);
+      }, 10);
+    });
+  }
+
   // Single reactive statement to update chart when selectedLift or timeframe changes
   $: {
     const chartKey = selectedLift + '-' + timeframe;
@@ -364,45 +474,55 @@
     for (const k in chartInstances) {
       if (chartInstances[k]) chartInstances[k].destroy();
     }
+    for (const k in miniChartInstances) {
+      if (miniChartInstances[k]) miniChartInstances[k].destroy();
+    }
   });
 
   $: if (selectedLifts.length > 0 && !selectedLift) {
     selectedLift = selectedLifts[0];
   }
+
+  // Update mini charts when results are available
+  $: if (Object.keys(results).length > 0 && selectedLifts.length > 0) {
+    setTimeout(() => {
+      updateMiniCharts();
+    }, 100);
+  }
 </script>
 
-<div class="max-w-7xl mx-auto px-4">
+<div class="max-w-7xl mx-auto px-1">
+  <!-- Timeframe Selector -->
+    <label for="timeframe-select" class="block text-sm font-medium text-gray-700 mb-2">Timeframe</label>
+    <select 
+      id="timeframe-select"
+      bind:value={timeframe}
+      class="w-full md:w-64 px-2 py-1 mb-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+      <option value="all">All Time</option>
+      <option value="1y">Last Year</option>
+      <option value="6m">Last 6 Months</option>
+      <option value="3m">Last 3 Months</option>
+    </select>
+
+  <!-- Horizontally Scrollable Mini Charts -->
+  <div class="mb-4 overflow-x-auto whitespace-nowrap pb-2">
+    <div class="inline-flex gap-2">
+      {#each selectedLifts as lift}
+        <button 
+          on:click={() => selectedLift = lift}
+          class="inline-block bg-white rounded border p-2 hover:shadow-md transition-shadow cursor-pointer {selectedLift === lift ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-200'}"
+          style="width: 15vw; min-width: 160px;">
+          <div class="text-xs font-medium text-gray-700 mb-1 truncate">{liftNames[lift] || lift}</div>
+          <div style="height: 120px;">
+            <canvas id={'mini-chart-' + lift}></canvas>
+          </div>
+        </button>
+      {/each}
+    </div>
+  </div>
+
   <!-- Charts View -->
   <div class="mb-6">
-    <!-- Exercise and Timeframe Selectors -->
-    <div class="bg-white rounded-lg shadow-sm p-4 mb-4">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label for="exercise-select" class="block text-sm font-medium text-gray-700 mb-2">Select Exercise</label>
-          <select 
-            id="exercise-select"
-            bind:value={selectedLift}
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            {#each selectedLifts as lift}
-              <option value={lift}>{liftNames[lift] || lift}</option>
-            {/each}
-          </select>
-        </div>
-        
-        <div>
-          <label for="timeframe-select" class="block text-sm font-medium text-gray-700 mb-2">Timeframe</label>
-          <select 
-            id="timeframe-select"
-            bind:value={timeframe}
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            <option value="all">All Time</option>
-            <option value="1y">Last Year</option>
-            <option value="6m">Last 6 Months</option>
-            <option value="3m">Last 3 Months</option>
-          </select>
-        </div>
-      </div>
-    </div>
 
       <!-- Selected Lift Chart -->
       {#if selectedLift && results[selectedLift]}

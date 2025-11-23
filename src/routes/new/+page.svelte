@@ -61,6 +61,8 @@
     { lift: 'REVERSE_EZ_BAR_CURL', start: '2025-07-29', end: '2025-07-29', multiplier: 1.8 },
     { lift: 'REVERSE_EZ_BAR_CURL', start: '2025-01-07', end: '2025-04-30', multiplier: 1.8 },
     { lift: 'WEIGHTED_LEG_CURL', start: '2025-08-24', end: '2026-08-24', multiplier: 1.36 },
+    { lift: 'WEIGHTED_CRUNCH', start: '2025-08-24', end: '2026-08-24', multiplier: 0.64 },
+    { lift: 'LATERAL_RAISE', start: '2025-08-24', end: '2026-08-24', multiplier: 0.52 },
   ];
 
   let selectedLifts = [
