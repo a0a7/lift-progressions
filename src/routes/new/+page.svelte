@@ -33,7 +33,7 @@
     },
     pull: {
       muscles: ['LATS', 'TRAPS', 'BICEPS'],
-      color: 'pink'
+      color: 'yellow'
     },
     antagonist_push: {
       muscles: ['CHEST', 'SHOULDERS', 'BICEPS'],
@@ -41,11 +41,11 @@
     },
     antagonist_pull: {
       muscles: ['LATS', 'TRAPS', 'TRICEPS'],
-      color: 'cyan'
+      color: 'green'
     },
     legs: {
       muscles: ['QUADS', 'HAMSTRINGS', 'GLUTES', 'CALVES', 'ADDUCTORS', 'ABDUCTORS'],
-      color: 'green'
+      color: 'purple'
     },
   };
 
