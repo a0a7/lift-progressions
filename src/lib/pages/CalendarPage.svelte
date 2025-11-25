@@ -331,83 +331,89 @@
             </div>
         {/if}
 
-        <h2 class="text-2xl text-center font-black pb-4 pt-4">Last Year</h2>
-        <div class="flex">
-            <div class="mt-[1px] text-right pr-1">   
-                {#each weekdays as weekday}
-                    <div class="text-[9.5px] -my-[1.1px]">{weekday}</div>
-                {/each}
-            </div>
-            {#each past52Weeks as week}
-                <div class="mx-[1px] {week === past52Weeks[0] ? 'mt-auto' : ''}">
-                    {#each week as date}
-                        {@const dayActivities = transformedActivities.filter(a => isSameDay(new Date(a.startTime), date))}
-                        {@const allSets = dayActivities.flatMap(a => a.exerciseSets || [])}
-                        {@const result = determineSplitDay(allSets)}
-                        {@const times = allSets.map(s => new Date(s.start_time).getTime()).sort((a, b) => a - b)}
-                        {@const totalMinutes = times.length > 0 ? Math.round((times[times.length - 1] - times[0]) / 60000) : 0}
-                        {@const volumeColor = getVolumeColor(allSets.length)}
-                        {@const timeColor = getTimeColor(totalMinutes)}
-                        <div 
-                            class="w-[12px] h-[12px] my-[1px] rounded-[2px] shadow-slate-900/10 dark:shadow-slate-900/50 shadow-inner {viewMode === 'split' ? getColor(result.splitType, allSets.length) : ''}"
-                            style="{viewMode === 'volume' ? `background-color: ${volumeColor}` : viewMode === 'time' ? `background-color: ${timeColor}` : ''}"
-                            title="{format(date, 'yyyy-MM-dd')}"
-                            on:mouseover={(e) => handleMouseOver(e, date)}
-                            on:mouseout={handleMouseOut}
-                            role="button"
-                            tabindex="0">
+        <h2 class="text-xl sm:text-2xl text-center font-black pb-3 pt-4">Last Year</h2>
+        <div class="overflow-x-auto pb-2 -mx-2 px-2">
+            <div class="inline-block min-w-fit">
+                <div class="flex scale-90 sm:scale-95 origin-top-left">
+                    <div class="mt-[1px] text-right pr-1">   
+                        {#each weekdays as weekday}
+                            <div class="text-[9.5px] -my-[1.1px]">{weekday}</div>
+                        {/each}
+                    </div>
+                    {#each past52Weeks as week}
+                        <div class="mx-[1px] {week === past52Weeks[0] ? 'mt-auto' : ''}">
+                            {#each week as date}
+                                {@const dayActivities = transformedActivities.filter(a => isSameDay(new Date(a.startTime), date))}
+                                {@const allSets = dayActivities.flatMap(a => a.exerciseSets || [])}
+                                {@const result = determineSplitDay(allSets)}
+                                {@const times = allSets.map(s => new Date(s.start_time).getTime()).sort((a, b) => a - b)}
+                                {@const totalMinutes = times.length > 0 ? Math.round((times[times.length - 1] - times[0]) / 60000) : 0}
+                                {@const volumeColor = getVolumeColor(allSets.length)}
+                                {@const timeColor = getTimeColor(totalMinutes)}
+                                <div 
+                                    class="w-[12px] h-[12px] my-[1px] rounded-[2px] shadow-slate-900/10 dark:shadow-slate-900/50 shadow-inner {viewMode === 'split' ? getColor(result.splitType, allSets.length) : ''}"
+                                    style="{viewMode === 'volume' ? `background-color: ${volumeColor}` : viewMode === 'time' ? `background-color: ${timeColor}` : ''}"
+                                    title="{format(date, 'yyyy-MM-dd')}"
+                                    on:mouseover={(e) => handleMouseOver(e, date)}
+                                    on:mouseout={handleMouseOut}
+                                    role="button"
+                                    tabindex="0">
+                                </div>
+                            {/each}
                         </div>
                     {/each}
                 </div>
-            {/each}
-        </div>
-        
-        <div class="flex px-1">
-            {#each past52WeeksMonthLabels as { month, index }}
-                <div class="mx-[25px] flex w-[13px] text-[9px]" style="grid-column-start: {index + 2}">{month}</div>
-            {/each}
+                
+                <div class="flex px-1 scale-90 sm:scale-95 origin-top-left">
+                    {#each past52WeeksMonthLabels as { month, index }}
+                        <div class="mx-[25px] flex w-[13px] text-[9px]" style="grid-column-start: {index + 2}">{month}</div>
+                    {/each}
+                </div>
+            </div>
         </div>
     </div>
     <div class="pt-4">
-        <h2 class="text-2xl font-black text-center">By Year</h2>
+        <h2 class="text-xl sm:text-2xl font-black text-center pb-2">By Year</h2>
         {#each (Object.keys(heatmapDataByYear)).reverse() as year}
             {#if String(year) === String(years[0]) || showAllYears}
-                <div class="mx-auto w-fit">
-                    <h2 class="text-xs px-8 transform scale-x-[102.5%] font-black pt-2">{year}</h2>
-                    <div class="flex">
-                        <div class="mt-[1px] text-right pr-1">   
-                            {#each weekdays as weekday}
-                                <div class="text-[9.5px] -my-[1.1px]">{weekday}</div>
-                            {/each}
-                        </div>
-                        {#each weeksByYear[year] as week}
-                            <div class="mx-[1px] {week === weeksByYear[year][0] ? 'mt-auto' : ''}">
-                                {#each week as date}
-                                    {@const activity = heatmapDataByYear[year].find(d => isSameDay(d.date, date))}
-                                    {@const volumeColor = getVolumeColor(activity?.totalSets || 0)}
-                                    {@const timeColor = getTimeColor(activity?.totalMinutes || 0)}
-                                    <div 
-                                        class="w-[12px] h-[12px] my-[1px] rounded-[2px] shadow-slate-900/10 dark:shadow-slate-900/50 shadow-inner {viewMode === 'split' ? getColor(activity?.splitType, activity?.totalSets || 0) : ''}"
-                                        style="{viewMode === 'volume' ? `background-color: ${volumeColor}` : viewMode === 'time' ? `background-color: ${timeColor}` : ''}"
-                                        title="{format(date, 'yyyy-MM-dd')}"
-                                        on:mouseover={(e) => handleMouseOver(e, date)}
-                                        on:mouseout={handleMouseOut}
-                                        role="button"
-                                        tabindex="0">
+                <div class="mb-4">
+                    <h3 class="text-xs font-black pt-2 pb-1 text-center sm:text-left sm:pl-8">{year}</h3>
+                    <div class="overflow-x-auto pb-2 -mx-2 px-2">
+                        <div class="inline-block min-w-fit">
+                            <div class="flex scale-90 sm:scale-95 origin-top-left">
+                                <div class="mt-[1px] text-right pr-1">   
+                                    {#each weekdays as weekday}
+                                        <div class="text-[9.5px] -my-[1.1px]">{weekday}</div>
+                                    {/each}
+                                </div>
+                                {#each weeksByYear[year] as week}
+                                    <div class="mx-[1px] {week === weeksByYear[year][0] ? 'mt-auto' : ''}">
+                                        {#each week as date}
+                                            {@const activity = heatmapDataByYear[year].find(d => isSameDay(d.date, date))}
+                                            {@const volumeColor = getVolumeColor(activity?.totalSets || 0)}
+                                            {@const timeColor = getTimeColor(activity?.totalMinutes || 0)}
+                                            <div 
+                                                class="w-[12px] h-[12px] my-[1px] rounded-[2px] shadow-slate-900/10 dark:shadow-slate-900/50 shadow-inner {viewMode === 'split' ? getColor(activity?.splitType, activity?.totalSets || 0) : ''}"
+                                                style="{viewMode === 'volume' ? `background-color: ${volumeColor}` : viewMode === 'time' ? `background-color: ${timeColor}` : ''}"
+                                                title="{format(date, 'yyyy-MM-dd')}"
+                                                on:mouseover={(e) => handleMouseOver(e, date)}
+                                                on:mouseout={handleMouseOut}
+                                                role="button"
+                                                tabindex="0">
+                                            </div>
+                                        {/each}
                                     </div>
                                 {/each}
                             </div>
-                        {/each}
+                            <div class="flex scale-90 sm:scale-95 origin-top-left">
+                                {#each monthLabelsByYear[year] as { month, index }}
+                                    <div class="mx-[24.5px] flex w-[13px] text-[9px]" style="grid-column-start: {index + 2}">{month}</div>
+                                {/each}
+                            </div>
+                        </div>
                     </div>
                 </div>
             {/if}
-            <div class="w-fit mx-auto">
-                <div class="flex">
-                    {#each monthLabelsByYear[year] as { month, index }}
-                        <div class="mx-[24.5px] flex w-[13px] text-[9px]" style="grid-column-start: {index + 2}">{month}</div>
-                    {/each}
-                </div>
-            </div>
         {/each}
         {#if !showAllYears && years.length > 1}
             <div class="flex justify-center pt-4">

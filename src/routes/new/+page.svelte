@@ -22,6 +22,7 @@
 
   let activities: Activity[] = [];
   let currentView: 'home' | 'summary' | 'calendar' | 'trends' | 'table' = 'home';
+  let sidebarOpen = false;
   
   let syncing = false;
   let syncMessage = '';
@@ -265,9 +266,33 @@
   }
 </script>
 
-<div class="flex h-screen">
+<div class="flex h-screen overflow-hidden">
+  <!-- Mobile Menu Button -->
+  <button 
+    class="md:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg border border-gray-200"
+    on:click={() => sidebarOpen = !sidebarOpen}
+  >
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      {#if sidebarOpen}
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+      {:else}
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      {/if}
+    </svg>
+  </button>
+
+  <!-- Overlay for mobile -->
+  {#if sidebarOpen}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div 
+      class="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+      on:click={() => sidebarOpen = false}
+    ></div>
+  {/if}
+
   <!-- Sidebar -->
-  <aside class="w-64 bg-white border-r border-gray-200 p-4 flex flex-col">
+  <aside class="w-64 bg-white border-r border-gray-200 p-4 flex flex-col fixed md:static h-full z-40 transform transition-transform duration-300 {sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}">
     <div class="mb-8">
       <h1 class="text-xl font-bold mb-1">a0a7 <span class="text-sm font-normal text-gray-500"></span></h1>
       <p class="text-sm text-gray-600">hello ur fat</p>
@@ -276,7 +301,7 @@
     <nav class="space-y-1 flex-1">
       <button 
         class="w-full text-left px-3 py-2 rounded-md flex items-center gap-3 {currentView === 'home' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}"
-        on:click={() => currentView = 'home'}
+        on:click={() => { currentView = 'home'; sidebarOpen = false; }}
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
@@ -296,7 +321,7 @@
       
       <button 
         class="w-full text-left px-3 py-2 rounded-md flex items-center gap-3 {currentView === 'trends' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}"
-        on:click={() => currentView = 'trends'}
+        on:click={() => { currentView = 'trends'; sidebarOpen = false; }}
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
@@ -306,7 +331,7 @@
       
       <button 
         class="w-full text-left px-3 py-2 rounded-md flex items-center gap-3 {currentView === 'summary' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}"
-        on:click={() => currentView = 'summary'}
+        on:click={() => { currentView = 'summary'; sidebarOpen = false; }}
       >
         <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z"/><path d="m2.5 21.5 1.4-1.4"/><path d="m20.1 3.9 1.4-1.4"/><path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z"/><path d="m9.6 14.4 4.8-4.8"/></svg>
         Progression
@@ -314,7 +339,7 @@
       
       <button 
         class="w-full text-left px-3 py-2 rounded-md flex items-center gap-3 {currentView === 'table' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}"
-        on:click={() => currentView = 'table'}
+        on:click={() => { currentView = 'table'; sidebarOpen = false; }}
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
@@ -341,7 +366,7 @@
   </aside>
 
   <!-- Main Content -->
-  <main class="flex-1 overflow-auto p-6 bg-gray-50">
+  <main class="flex-1 overflow-auto p-4 md:p-6 bg-gray-50 md:ml-0">
     {#if currentView === 'home'}
       <HomePage {activities} />
     {:else if currentView === 'summary'}

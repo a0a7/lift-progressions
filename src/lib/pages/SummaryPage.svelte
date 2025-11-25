@@ -491,13 +491,13 @@
   }
 </script>
 
-<div class="max-w-7xl mx-auto px-1">
+<div class="max-w-7xl mx-auto px-2 sm:px-4">
   <!-- Timeframe Selector -->
     <label for="timeframe-select" class="block text-sm font-medium text-gray-700 mb-2">Timeframe</label>
     <select 
       id="timeframe-select"
       bind:value={timeframe}
-      class="w-full md:w-64 px-2 py-1 mb-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+      class="w-full md:w-64 px-2 py-1 mb-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm md:text-base">
       <option value="all">All Time</option>
       <option value="1y">Last Year</option>
       <option value="6m">Last 6 Months</option>
@@ -505,15 +505,15 @@
     </select>
 
   <!-- Horizontally Scrollable Mini Charts -->
-  <div class="mb-4 overflow-x-auto whitespace-nowrap pb-2">
+  <div class="mb-4 overflow-x-auto whitespace-nowrap pb-2 -mx-2 px-2">
     <div class="inline-flex gap-2">
       {#each selectedLifts as lift}
         <button 
           on:click={() => selectedLift = lift}
           class="inline-block bg-white rounded border p-2 hover:shadow-md transition-shadow cursor-pointer {selectedLift === lift ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-200'}"
-          style="width: 15vw; min-width: 160px;">
+          style="width: max(15vw, 140px); min-width: 140px;">
           <div class="text-xs font-medium text-gray-700 mb-1 truncate">{liftNames[lift] || lift}</div>
-          <div style="height: 120px;">
+          <div style="height: 100px;">
             <canvas id={'mini-chart-' + lift}></canvas>
           </div>
         </button>
@@ -527,11 +527,11 @@
       <!-- Selected Lift Chart -->
       {#if selectedLift && results[selectedLift]}
         {@const liftStats = summaryTable.find(row => row.lift === selectedLift)}
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-2xl font-bold text-gray-800">{liftNames[selectedLift] || selectedLift}</h2>
+        <div class="bg-white rounded-lg shadow-md p-3 sm:p-6">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-800">{liftNames[selectedLift] || selectedLift}</h2>
             {#if trendlineEquations[selectedLift]}
-              <div class="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+              <div class="text-xs sm:text-sm text-gray-600 bg-gray-100 px-2 sm:px-3 py-1 rounded-full">
                 {trendlineEquations[selectedLift]}
               </div>
             {/if}
@@ -539,26 +539,26 @@
           
           <!-- Stats Cards -->
           {#if liftStats}
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+              <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 sm:p-4 border border-blue-200">
                 <div class="text-xs font-medium text-blue-600 mb-1">Current 6RM</div>
-                <div class="text-2xl font-bold text-blue-900">{liftStats.avg6RM_recent.toFixed(0)} lbs</div>
+                <div class="text-lg sm:text-2xl font-bold text-blue-900">{liftStats.avg6RM_recent.toFixed(0)} lbs</div>
               </div>
-              <div class="bg-gradient-to-br {liftStats.pct_increase > 0 ? 'from-green-50 to-green-100' : liftStats.pct_increase < 0 ? 'from-red-50 to-red-100' : 'from-gray-50 to-gray-100'} rounded-lg p-4 border {liftStats.pct_increase > 0 ? 'border-green-200' : liftStats.pct_increase < 0 ? 'border-red-200' : 'border-gray-200'}">
+              <div class="bg-gradient-to-br {liftStats.pct_increase > 0 ? 'from-green-50 to-green-100' : liftStats.pct_increase < 0 ? 'from-red-50 to-red-100' : 'from-gray-50 to-gray-100'} rounded-lg p-3 sm:p-4 border {liftStats.pct_increase > 0 ? 'border-green-200' : liftStats.pct_increase < 0 ? 'border-red-200' : 'border-gray-200'}">
                 <div class="text-xs font-medium {liftStats.pct_increase > 0 ? 'text-green-600' : liftStats.pct_increase < 0 ? 'text-red-600' : 'text-gray-600'} mb-1">2-Week Change</div>
-                <div class="text-2xl font-bold {liftStats.pct_increase > 0 ? 'text-green-900' : liftStats.pct_increase < 0 ? 'text-red-900' : 'text-gray-900'}">
+                <div class="text-lg sm:text-2xl font-bold {liftStats.pct_increase > 0 ? 'text-green-900' : liftStats.pct_increase < 0 ? 'text-red-900' : 'text-gray-900'}">
                   {liftStats.pct_increase > 0 ? '+' : ''}{liftStats.pct_increase.toFixed(1)}%
                 </div>
               </div>
-              <div class="bg-gradient-to-br {liftStats.pct_increase_6mo > 0 ? 'from-green-50 to-green-100' : liftStats.pct_increase_6mo < 0 ? 'from-red-50 to-red-100' : 'from-gray-50 to-gray-100'} rounded-lg p-4 border {liftStats.pct_increase_6mo > 0 ? 'border-green-200' : liftStats.pct_increase_6mo < 0 ? 'border-red-200' : 'border-gray-200'}">
+              <div class="bg-gradient-to-br {liftStats.pct_increase_6mo > 0 ? 'from-green-50 to-green-100' : liftStats.pct_increase_6mo < 0 ? 'from-red-50 to-red-100' : 'from-gray-50 to-gray-100'} rounded-lg p-3 sm:p-4 border {liftStats.pct_increase_6mo > 0 ? 'border-green-200' : liftStats.pct_increase_6mo < 0 ? 'border-red-200' : 'border-gray-200'}">
                 <div class="text-xs font-medium {liftStats.pct_increase_6mo > 0 ? 'text-green-600' : liftStats.pct_increase_6mo < 0 ? 'text-red-600' : 'text-gray-600'} mb-1">6-Month Change</div>
-                <div class="text-2xl font-bold {liftStats.pct_increase_6mo > 0 ? 'text-green-900' : liftStats.pct_increase_6mo < 0 ? 'text-red-900' : 'text-gray-900'}">
+                <div class="text-lg sm:text-2xl font-bold {liftStats.pct_increase_6mo > 0 ? 'text-green-900' : liftStats.pct_increase_6mo < 0 ? 'text-red-900' : 'text-gray-900'}">
                   {liftStats.pct_increase_6mo > 0 ? '+' : ''}{liftStats.pct_increase_6mo.toFixed(1)}%
                 </div>
               </div>
-              <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+              <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-3 sm:p-4 border border-purple-200">
                 <div class="text-xs font-medium text-purple-600 mb-1">6-Month Gain</div>
-                <div class="text-2xl font-bold text-purple-900">
+                <div class="text-lg sm:text-2xl font-bold text-purple-900">
                   {liftStats.raw_increase_6mo > 0 ? '+' : ''}{liftStats.raw_increase_6mo.toFixed(1)} lbs
                 </div>
               </div>
@@ -566,38 +566,38 @@
           {/if}
 
           {#key selectedLift + timeframe}
-            <div class="h-96">
+            <div class="h-64 sm:h-80 lg:h-96">
               <canvas id={'chart-' + selectedLift}></canvas>
             </div>
           {/key}
         </div>
 
           <!-- Detailed Data Table -->
-          <div class="bg-white rounded-lg shadow-md p-6 mt-4">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">Workout History</h3>
+          <div class="bg-white rounded-lg shadow-md p-3 sm:p-6 mt-4">
+            <h3 class="text-base sm:text-lg font-bold text-gray-800 mb-4">Workout History</h3>
             <div class="overflow-x-auto">
-              <table class="w-full text-sm">
+              <table class="w-full text-xs sm:text-sm">
                 <thead>
                   <tr class="bg-gray-100 border-b">
-                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
-                    <th class="px-4 py-3 text-right font-semibold text-gray-700">Volume (kg)</th>
-                    <th class="px-4 py-3 text-right font-semibold text-gray-700">Reps</th>
-                    <th class="px-4 py-3 text-right font-semibold text-gray-700">Sets</th>
-                    <th class="px-4 py-3 text-right font-semibold text-gray-700">Avg Wt (lbs)</th>
-                    <th class="px-4 py-3 text-right font-semibold text-gray-700">Avg Reps</th>
-                    <th class="px-4 py-3 text-right font-semibold text-gray-700">6RM (lbs)</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-700">Date</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right font-semibold text-gray-700">Vol (kg)</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right font-semibold text-gray-700">Reps</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right font-semibold text-gray-700">Sets</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right font-semibold text-gray-700 hidden sm:table-cell">Avg Wt (lbs)</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right font-semibold text-gray-700 hidden sm:table-cell">Avg Reps</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right font-semibold text-gray-700">6RM (lbs)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {#each results[selectedLift] as row}
                     <tr class="border-b hover:bg-gray-50">
-                      <td class="px-4 py-3 text-gray-900">{row[0]}</td>
-                      <td class="px-4 py-3 text-right text-gray-700">{row[1].toFixed(1)}</td>
-                      <td class="px-4 py-3 text-right text-gray-700">{row[2]}</td>
-                      <td class="px-4 py-3 text-right text-gray-700">{row[3]}</td>
-                      <td class="px-4 py-3 text-right text-gray-700">{row[5].toFixed(1)}</td>
-                      <td class="px-4 py-3 text-right text-gray-700">{row[6].toFixed(1)}</td>
-                      <td class="px-4 py-3 text-right font-semibold text-gray-900">{row[8].toFixed(1)}</td>
+                      <td class="px-2 sm:px-4 py-2 sm:py-3 text-gray-900 text-xs sm:text-sm">{row[0]}</td>
+                      <td class="px-2 sm:px-4 py-2 sm:py-3 text-right text-gray-700">{row[1].toFixed(1)}</td>
+                      <td class="px-2 sm:px-4 py-2 sm:py-3 text-right text-gray-700">{row[2]}</td>
+                      <td class="px-2 sm:px-4 py-2 sm:py-3 text-right text-gray-700">{row[3]}</td>
+                      <td class="px-2 sm:px-4 py-2 sm:py-3 text-right text-gray-700 hidden sm:table-cell">{row[5].toFixed(1)}</td>
+                      <td class="px-2 sm:px-4 py-2 sm:py-3 text-right text-gray-700 hidden sm:table-cell">{row[6].toFixed(1)}</td>
+                      <td class="px-2 sm:px-4 py-2 sm:py-3 text-right font-semibold text-gray-900">{row[8].toFixed(1)}</td>
                     </tr>
                   {/each}
                 </tbody>

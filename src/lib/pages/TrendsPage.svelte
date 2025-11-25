@@ -624,24 +624,24 @@
   </div>
 
   <!-- Filtered Period Charts -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-    <div class="bg-white rounded-lg shadow p-4">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-4">
+    <div class="bg-white rounded-lg shadow p-2">
       <canvas bind:this={setsPerWorkoutChartCanvas}></canvas>
     </div>
 
-    <div class="bg-white rounded-lg shadow p-4">
+    <div class="bg-white rounded-lg shadow p-2">
       <canvas bind:this={setsPerWeekChartCanvas}></canvas>
     </div>
 
-    <div class="bg-white rounded-lg shadow p-4">
+    <div class="bg-white rounded-lg shadow p-2">
       <canvas bind:this={timePerSetChartCanvas}></canvas>
     </div>
 
-    <div class="bg-white rounded-lg shadow p-4">
+    <div class="bg-white rounded-lg shadow p-2">
       <canvas bind:this={avgWeightPerSetChartCanvas}></canvas>
     </div>
 
-    <div class="bg-white rounded-lg shadow p-4">
+    <div class="bg-white rounded-lg shadow p-2">
       <canvas bind:this={avgRepsPerSetChartCanvas}></canvas>
     </div>
   </div>
@@ -660,24 +660,24 @@
         <div class="border rounded-lg p-4 mb-6">
           <h4 class="text-3xl font-black text-center mb-4 text-gray-700">{year}</h4>
           
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="bg-white rounded-lg shadow p-4">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-2">
+            <div class="bg-white rounded-lg shadow p-2">
               <canvas id="yearly-sets-per-workout-{year}"></canvas>
             </div>
 
-            <div class="bg-white rounded-lg shadow p-4">
+            <div class="bg-white rounded-lg shadow p-2">
               <canvas id="yearly-sets-per-week-{year}"></canvas>
             </div>
 
-            <div class="bg-white rounded-lg shadow p-4">
+            <div class="bg-white rounded-lg shadow p-2">
               <canvas id="yearly-time-per-set-{year}"></canvas>
             </div>
 
-            <div class="bg-white rounded-lg shadow p-4">
+            <div class="bg-white rounded-lg shadow p-2">
               <canvas id="yearly-avg-weight-per-set-{year}"></canvas>
             </div>
 
-            <div class="bg-white rounded-lg shadow p-4">
+            <div class="bg-white rounded-lg shadow p-2">
               <canvas id="yearly-avg-reps-per-set-{year}"></canvas>
             </div>
           </div>
