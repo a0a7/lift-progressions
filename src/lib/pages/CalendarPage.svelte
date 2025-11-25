@@ -333,8 +333,8 @@
 
         <h2 class="text-xl sm:text-2xl text-center font-black pb-3 pt-4">Last Year</h2>
         <div class="overflow-x-auto pb-2 -mx-2 px-2">
-            <div class="inline-block min-w-fit">
-                <div class="flex scale-90 sm:scale-95 origin-top-left">
+            <div class="inline-block min-w-fit mx-auto" style="display: table; margin-left: auto; margin-right: auto;">
+                <div class="flex scale-90 sm:scale-95 origin-top-left sm:origin-top">
                     <div class="mt-[1px] text-right pr-1">   
                         {#each weekdays as weekday}
                             <div class="text-[9.5px] -my-[1.1px]">{weekday}</div>
@@ -364,7 +364,7 @@
                     {/each}
                 </div>
                 
-                <div class="flex px-1 scale-90 sm:scale-95 origin-top-left">
+                <div class="flex px-1 scale-90 sm:scale-95 origin-top-left sm:origin-top">
                     {#each past52WeeksMonthLabels as { month, index }}
                         <div class="mx-[25px] flex w-[13px] text-[9px]" style="grid-column-start: {index + 2}">{month}</div>
                     {/each}
@@ -377,10 +377,10 @@
         {#each (Object.keys(heatmapDataByYear)).reverse() as year}
             {#if String(year) === String(years[0]) || showAllYears}
                 <div class="mb-4">
-                    <h3 class="text-xs font-black pt-2 pb-1 text-center sm:text-left sm:pl-8">{year}</h3>
+                    <h3 class="text-xs font-black pt-2 pb-1 text-center">{year}</h3>
                     <div class="overflow-x-auto pb-2 -mx-2 px-2">
-                        <div class="inline-block min-w-fit">
-                            <div class="flex scale-90 sm:scale-95 origin-top-left">
+                        <div class="inline-block min-w-fit mx-auto" style="display: table; margin-left: auto; margin-right: auto;">
+                            <div class="flex scale-90 sm:scale-95 origin-top-left sm:origin-top">
                                 <div class="mt-[1px] text-right pr-1">   
                                     {#each weekdays as weekday}
                                         <div class="text-[9.5px] -my-[1.1px]">{weekday}</div>
@@ -405,7 +405,7 @@
                                     </div>
                                 {/each}
                             </div>
-                            <div class="flex scale-90 sm:scale-95 origin-top-left">
+                            <div class="flex scale-90 sm:scale-95 origin-top-left sm:origin-top">
                                 {#each monthLabelsByYear[year] as { month, index }}
                                     <div class="mx-[24.5px] flex w-[13px] text-[9px]" style="grid-column-start: {index + 2}">{month}</div>
                                 {/each}

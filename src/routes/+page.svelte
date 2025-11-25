@@ -1,30 +1,11 @@
 <script lang="ts">
-let syncing = false;
-let syncMessage = '';
-let syncRawResponse: string | null = null;
-
-async function syncGarmin() {
-  syncing = true;
-  syncMessage = '';
-  syncRawResponse = null;
-  try {
-    const res = await fetch('https://garmin-sync-worker.lev-s-cloudflare.workers.dev/sync');
-    const text = await res.text();
-    syncRawResponse = text;
-    if (res.ok) {
-      syncMessage = 'Sync request sent!';
-    } else {
-      syncMessage = 'Sync failed: ' + res.status;
-    }
-  } catch (e) {
-    syncMessage = 'Sync error: ' + e;
-    syncRawResponse = null;
-  }
-  syncing = false;
-}
-  import { onMount, afterUpdate, onDestroy } from 'svelte';
-  import Chart from 'chart.js/auto';
-  import 'chartjs-adapter-date-fns';
+  import { onMount } from 'svelte';
+  import CalendarPage from '$lib/pages/CalendarPage.svelte';
+  import SummaryPage from '$lib/pages/SummaryPage.svelte';
+  import HomePage from '$lib/pages/HomePage.svelte';
+  import TrendsPage from '$lib/pages/TrendsPage.svelte';
+  import TablePage from '$lib/pages/TablePage.svelte';
+  import muscleGroupsData from '$lib/muscle-groups.json';
 
   type ExerciseSet = {
     exercise_name: string;
@@ -39,21 +20,53 @@ async function syncGarmin() {
     exercise_sets: ExerciseSet[];
   };
 
-  type LiftSummary = [
-    string, // date
-    number, // volume (kg)
-    number, // total reps
-    number, // total sets
-    number, // volume (lbs)
-    number, // avg weight (lbs)
-    number, // avg reps
-    number, // Lombardi 1RM (lbs)
-    number  // Lombardi 6RM (lbs)
+  let activities: Activity[] = [];
+  let currentView: 'home' | 'summary' | 'calendar' | 'trends' | 'table' = 'home';
+  let sidebarOpen = false;
+  
+  let syncing = false;
+  let syncMessage = '';
+
+  const splitConfig = {
+    push: {
+      muscles: ['CHEST', 'SHOULDERS', 'TRICEPS'],
+      color: 'red'
+    },
+    pull: {
+      muscles: ['LATS', 'TRAPS', 'BICEPS'],
+      color: 'yellow'
+    },
+    antagonist_push: {
+      muscles: ['CHEST', 'SHOULDERS', 'BICEPS'],
+      color: 'blue'
+    },
+    antagonist_pull: {
+      muscles: ['LATS', 'TRAPS', 'TRICEPS'],
+      color: 'green'
+    },
+    legs: {
+      muscles: ['QUADS', 'HAMSTRINGS', 'GLUTES', 'CALVES', 'ADDUCTORS', 'ABDUCTORS'],
+      color: 'purple'
+    },
+  };
+
+  // Weight multipliers for specific lifts between specific dates
+  const weightMultipliers: Array<{ lift: string; start: string; end: string; multiplier: number }> = [
+    { lift: 'WEIGHTED_CRUNCH', start: '2025-06-23', end: '2025-06-23', multiplier: 0.9 },
+    { lift: 'WEIGHTED_CRUNCH', start: '2024-08-18', end: '2025-04-13', multiplier: 0.7 },    
+    { lift: 'WEIGHTED_LEG_CURL', start: '2025-06-15', end: '2025-07-25', multiplier: 1.7 },
+    { lift: 'EZ_BAR_PREACHER_CURL', start: '2024-06-24', end: '2025-07-12', multiplier: 0.85 },
+    { lift: 'EZ_BAR_PREACHER_CURL', start: '2025-08-24', end: '2026-07-12', multiplier: 1.35 },
+    { lift: 'SEATED_REAR_LATERAL_RAISE', start: '2025-06-13', end: '2025-07-11', multiplier: 1.3 },
+    { lift: 'LATERAL_RAISE', start: '2025-02-16', end: '2025-02-16', multiplier: 0.7 },
+    { lift: 'REVERSE_EZ_BAR_CURL', start: '2025-07-29', end: '2025-07-29', multiplier: 1.8 },
+    { lift: 'REVERSE_EZ_BAR_CURL', start: '2025-01-07', end: '2025-04-30', multiplier: 1.8 },
+    { lift: 'WEIGHTED_LEG_CURL', start: '2025-08-24', end: '2026-08-24', multiplier: 1.36 },
+    { lift: 'WEIGHTED_CRUNCH', start: '2025-08-24', end: '2026-08-24', multiplier: 0.64 },
+    { lift: 'LATERAL_RAISE', start: '2025-08-24', end: '2026-08-24', multiplier: 0.52 },
   ];
 
-
-let activities: Activity[] = [];
-let selectedLifts = [
+  let selectedLifts = [
     'INCLINE_SMITH_MACHINE_BENCH_PRESS',
     'FLYE',
     'EZ_BAR_PREACHER_CURL',
@@ -66,403 +79,304 @@ let selectedLifts = [
     'WEIGHTED_LEG_CURL',
     'WEIGHTED_LEG_EXTENSIONS',
     'BARBELL_HACK_SQUAT',
-]
-let results: Record<string, LiftSummary[]> = {};
+  ];
 
-// Table data for summary
-let summaryTable: Array<{
-  lift: string;
-  avg6RM_recent: number;
-  avg6RM_prev: number;
-  raw_increase: number;
-  pct_increase: number;
-  avg6RM_6mo_ago: number;
-  raw_increase_6mo: number;
-  pct_increase_6mo: number;
-}> = [];
+  const liftNames: Record<string, string> = {
+    'INCLINE_SMITH_MACHINE_BENCH_PRESS': 'Incline Smith Bench',
+    'FLYE': 'Chest Fly',
+    'LATERAL_RAISE': 'Lateral Raise',
+    'SEATED_REAR_LATERAL_RAISE': 'Reverse Fly',
+    'EZ_BAR_PREACHER_CURL': 'Preacher Curl',
+    'REVERSE_EZ_BAR_CURL': 'Reverse Curl',
+    'TRICEPS_PRESSDOWN': 'Triceps Pushdown',
+    'CLOSE_GRIP_LAT_PULLDOWN': 'Close Grip Lat Pulldown',
+    'BARBELL_HACK_SQUAT': 'Barbell Hack Squat',
+    'WEIGHTED_LEG_EXTENSIONS': 'Leg Extension',
+    'WEIGHTED_LEG_CURL': 'Leg Curl',
+    'WEIGHTED_CRUNCH': 'Weighted Crunch',
+  };
 
-// User-readable names for each exercise
-const liftNames: Record<string, string> = {
-  'INCLINE_SMITH_MACHINE_BENCH_PRESS': 'Incline Smith Bench',
-  'FLYE': 'Chest Fly',
-  'LATERAL_RAISE': 'Lateral Raise',
-  'SEATED_REAR_LATERAL_RAISE': 'Reverse Fly',
-  'EZ_BAR_PREACHER_CURL': 'Preacher Curl',
-  'REVERSE_EZ_BAR_CURL': 'Reverse Curl',
-  'TRICEPS_PRESSDOWN': 'Triceps Pushdown',
-  'CLOSE_GRIP_LAT_PULLDOWN': 'Close Grip Lat Pulldown',
-  'BARBELL_HACK_SQUAT': 'Barbell Hack Squat',
-  'WEIGHTED_LEG_EXTENSIONS': 'Leg Extension',
-  'WEIGHTED_LEG_CURL': 'Leg Curl',
-  'WEIGHTED_CRUNCH': 'Weighted Crunch',
-};
-
-// Weight multipliers for specific lifts between specific dates
-// Each entry: { lift: string, start: string (YYYY-MM-DD), end: string (YYYY-MM-DD), multiplier: number }
-const weightMultipliers: Array<{ lift: string; start: string; end: string; multiplier: number }> = [
-        { lift: 'WEIGHTED_CRUNCH', start: '2025-06-23', end: '2025-06-23', multiplier: 0.9 },
-    { lift: 'WEIGHTED_CRUNCH', start: '2024-08-18', end: '2025-04-13', multiplier: 0.7 },    
-    { lift: 'WEIGHTED_LEG_CURL', start: '2025-06-15', end: '2025-07-25', multiplier: 1.7 },
-    { lift: 'EZ_BAR_PREACHER_CURL', start: '2024-06-24', end: '2025-07-12', multiplier: 0.85 },
-    { lift: 'SEATED_REAR_LATERAL_RAISE', start: '2025-06-13', end: '2025-07-11', multiplier: 1.3 },
-    { lift: 'LATERAL_RAISE', start: '2025-02-16', end: '2025-02-16', multiplier: 0.7 },
-    { lift: 'REVERSE_EZ_BAR_CURL', start: '2025-07-29', end: '2025-07-29', multiplier: 1.8 },
-        { lift: 'REVERSE_EZ_BAR_CURL', start: '2025-01-07   ', end: '2025-04-30', multiplier: 1.8 },
-
-
-];
-
-function getWeightMultiplier(lift: string, date: string): number {
-  // date: YYYY-MM-DD
-  let multiplier = 1;
-  for (const entry of weightMultipliers) {
-    if (
-      entry.lift === lift &&
-      date >= entry.start &&
-      date <= entry.end
-    ) {
-      multiplier *= entry.multiplier;
+  function getWeightMultiplier(lift: string, date: string): number {
+    let multiplier = 1;
+    for (const entry of weightMultipliers) {
+      if (
+        entry.lift === lift &&
+        date >= entry.start &&
+        date <= entry.end
+      ) {
+        multiplier *= entry.multiplier;
+      }
     }
+    return multiplier;
   }
-  return multiplier;
-}
 
-  const kgToLbs = (kg: number) => kg * 2.20462;
-  const lombardi1RM = (weight: number, reps: number) => weight * Math.pow(reps, 0.1);
-  const lombardi6RM = (weight: number, reps: number) => lombardi1RM(weight, reps) / Math.pow(6, 0.1);
+  // Determine which split day a workout is based on exercises
+  function determineSplitDay(exerciseSets: ExerciseSet[]): { splitType: string | null; confidence: number } {
+    if (!exerciseSets || exerciseSets.length === 0) {
+      return { splitType: null, confidence: 0 };
+    }
+
+    // Count muscle groups worked in this session
+    const muscleGroupCounts: Record<string, number> = {};
+    let totalMuscleScore = 0;
+    
+    exerciseSets.forEach(set => {
+      const exerciseData = muscleGroupsData[set.exercise_name as keyof typeof muscleGroupsData];
+      if (exerciseData) {
+        // Count primary muscles with more weight
+        exerciseData.primaryMuscles.forEach((muscle: string) => {
+          muscleGroupCounts[muscle] = (muscleGroupCounts[muscle] || 0) + 2;
+          totalMuscleScore += 2;
+        });
+        // Count secondary muscles
+        exerciseData.secondaryMuscles.forEach((muscle: string) => {
+          muscleGroupCounts[muscle] = (muscleGroupCounts[muscle] || 0) + 1;
+          totalMuscleScore += 1;
+        });
+      }
+    });
+
+    // Calculate score and coverage for each split type
+    const splitResults: Array<{
+      name: string;
+      score: number;
+      coverage: number;
+      muscleCount: number;
+      specificity: number;
+      adjustedScore: number;
+    }> = [];
+    
+    for (const [splitName, splitData] of Object.entries(splitConfig)) {
+      let score = 0;
+      let musclesHit = 0;
+      
+      splitData.muscles.forEach(muscle => {
+        if (muscleGroupCounts[muscle]) {
+          score += muscleGroupCounts[muscle];
+          musclesHit++;
+        }
+      });
+      
+      // Coverage: percentage of split's muscles that were worked
+      const coverage = musclesHit / splitData.muscles.length;
+      
+      // Specificity: inverse of muscle count (more specific splits are preferred)
+      const specificity = 1 / splitData.muscles.length;
+      
+      // Dynamic coverage threshold based on split size
+      // Larger splits need higher coverage to qualify
+      const minCoverage = splitData.muscles.length <= 3 ? 0.4 :  // Small splits: 40%
+                         splitData.muscles.length <= 5 ? 0.5 :  // Medium splits: 50%
+                         0.65;                                   // Large splits: 65%
+      
+      // Only consider splits that meet the coverage threshold
+      if (coverage >= minCoverage) {
+        // For single-muscle splits, require that muscle to be dominant in the workout
+        // Otherwise they match too easily (e.g., shoulders appearing in any push day)
+        if (splitData.muscles.length === 1) {
+          const singleMuscle = splitData.muscles[0];
+          const muscleScore = muscleGroupCounts[singleMuscle] || 0;
+          const musclePercentage = muscleScore / totalMuscleScore;
+          
+          // Single muscle must represent at least 40% of total work
+          if (musclePercentage < 0.4) {
+            continue; // Skip this split
+          }
+        }
+        
+        // Adjusted score balances raw score with specificity
+        // For very small splits (1-2 muscles), reduce the specificity bonus
+        const specificityWeight = splitData.muscles.length <= 2 ? 0.5 : 1.0;
+        const adjustedScore = score * Math.pow(specificity, specificityWeight) * coverage * 100;
+        
+        splitResults.push({
+          name: splitName,
+          score,
+          coverage,
+          muscleCount: splitData.muscles.length,
+          specificity,
+          adjustedScore
+        });
+      }
+    }
+
+    if (splitResults.length === 0) {
+      return { splitType: null, confidence: 0 };
+    }
+
+    // Sort primarily by adjusted score, which balances raw score with specificity
+    splitResults.sort((a, b) => {
+      // Use adjusted score which already accounts for specificity and coverage
+      if (Math.abs(a.adjustedScore - b.adjustedScore) > 0.5) {
+        return b.adjustedScore - a.adjustedScore;
+      }
+      // If adjusted scores are very close, prefer higher coverage
+      if (Math.abs(a.coverage - b.coverage) > 0.1) {
+        return b.coverage - a.coverage;
+      }
+      // Final tie-breaker: prefer more specific
+      return b.specificity - a.specificity;
+    });
+
+    const bestSplit = splitResults[0];
+    
+    // Calculate confidence based on:
+    // - How much of the split's muscles were worked (coverage)
+    // - How dominant this split is vs the next best option
+    let confidence = bestSplit.coverage * 100;
+    
+    if (splitResults.length > 1) {
+      const secondBest = splitResults[1];
+      const dominance = (bestSplit.adjustedScore - secondBest.adjustedScore) / bestSplit.adjustedScore;
+      confidence *= (0.7 + Math.min(dominance, 0.3)); // Reduce confidence if there's a close second
+    }
+
+    return {
+      splitType: bestSplit.name,
+      confidence: Math.min(Math.round(confidence), 100)
+    };
+  }
 
   onMount(async () => {
     const res = await fetch('https://garmin-sync-worker.lev-s-cloudflare.workers.dev/strength-activities');
     const json = await res.json();
     activities = json.activities;
+  });
 
-    // Helper to parse YYYY-MM-DD to Date
-    const parseDate = (d: string) => new Date(d + 'T00:00:00');
-    const today = new Date();
-    const msInDay = 24 * 60 * 60 * 1000;
-    const twoWeeksAgo = new Date(today.getTime() - 14 * msInDay);
-    const fourWeeksAgo = new Date(today.getTime() - 28 * msInDay);
-    const sixMonthsAgo = new Date(today.getTime() - 183 * msInDay);
-
-    summaryTable = [];
-
-    for (const lift of selectedLifts) {
-      results[lift] = [];
-      let allRows: LiftSummary[] = [];
-      for (const activity of activities) {
-        const sets = activity.exercise_sets?.filter(s => s.exercise_name === lift);
-        if (!sets || sets.length === 0) continue;
-
-        const date = activity.start_time.split(' ')[0];
-        const multiplier = getWeightMultiplier(lift, date);
-        // Apply multiplier to each set's weight
-        const adjustedSets = sets.map(s => ({ ...s, weight: s.weight * multiplier }));
-
-        const totalVolumeKg = adjustedSets.reduce((sum, s) => sum + s.weight * s.reps, 0);
-        const totalReps = adjustedSets.reduce((sum, s) => sum + s.reps, 0);
-        const totalSets = adjustedSets.length;
-
-        const avgWeightLbs = kgToLbs(totalVolumeKg / totalReps);
-        const avgReps = totalReps / totalSets;
-
-        const volumeLbs = kgToLbs(totalVolumeKg);
-        const est1RM = lombardi1RM(avgWeightLbs, avgReps);
-        const est6RM = lombardi6RM(avgWeightLbs, avgReps);
-
-        const row: LiftSummary = [
-          date,
-          totalVolumeKg,
-          totalReps,
-          totalSets,
-          volumeLbs,
-          avgWeightLbs,
-          avgReps,
-          est1RM,
-          est6RM
-        ];
-        results[lift].push(row);
-        allRows.push(row);
+  async function syncGarmin() {
+    syncing = true;
+    syncMessage = '';
+    try {
+      const res = await fetch('https://garmin-sync-worker.lev-s-cloudflare.workers.dev/sync');
+      if (res.ok) {
+        syncMessage = 'Sync successfully requested';
+        // Reload activities after sync
+        const activitiesRes = await fetch('https://garmin-sync-worker.lev-s-cloudflare.workers.dev/strength-activities');
+        const json = await activitiesRes.json();
+        activities = json.activities;
+      } else {
+        syncMessage = 'Sync failed';
       }
-
-      // Sort by date ascending
-      allRows.sort((a, b) => a[0].localeCompare(b[0]));
-
-      // Helper to get average 6RM in a date range
-      function avg6RMInRange(start: Date, end: Date) {
-        const filtered = allRows.filter(row => {
-          const d = parseDate(row[0]);
-          return d >= start && d < end;
-        });
-        if (filtered.length === 0) return 0;
-        return filtered.reduce((sum, row) => sum + (row[8] || 0), 0) / filtered.length;
-      }
-
-      // Most recent 2 weeks
-      const avg6RM_recent = avg6RMInRange(twoWeeksAgo, today);
-      // Previous 2 weeks
-      const avg6RM_prev = avg6RMInRange(fourWeeksAgo, twoWeeksAgo);
-      // 6 months ago (first 2 weeks in 6 month window)
-      let avg6RM_6mo_ago = avg6RMInRange(sixMonthsAgo, new Date(sixMonthsAgo.getTime() + 14 * msInDay));
-      // If no data for 6 months ago, use earliest available data
-      if (avg6RM_6mo_ago === 0 && allRows.length > 0) {
-        // Use average of first 2 weeks of data
-        const firstDate = parseDate(allRows[0][0]);
-        const first2w = new Date(firstDate.getTime() + 14 * msInDay);
-        avg6RM_6mo_ago = avg6RMInRange(firstDate, first2w);
-      }
-
-      // Raw and % increase (recent vs prev)
-      const raw_increase = avg6RM_recent - avg6RM_prev;
-      const pct_increase = avg6RM_prev === 0 ? 0 : (raw_increase / avg6RM_prev) * 100;
-
-      // 6 month raw and % increase (recent vs 6mo ago or earliest)
-      const raw_increase_6mo = avg6RM_recent - avg6RM_6mo_ago;
-      const pct_increase_6mo = avg6RM_6mo_ago === 0 ? 0 : (raw_increase_6mo / avg6RM_6mo_ago) * 100;
-
-      summaryTable.push({
-        lift,
-        avg6RM_recent,
-        avg6RM_prev,
-        raw_increase,
-        pct_increase,
-        avg6RM_6mo_ago,
-        raw_increase_6mo,
-        pct_increase_6mo
-      });
+    } catch (e) {
+      syncMessage = 'Sync error';
     }
-  });
-
-let chartInstances: Record<string, Chart> = {};
-let trendlineEquations: Record<string, string> = {};
-
-  function get12MonthData(lift: string) {
-    const now = new Date();
-    const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-    return (results[lift] || []).filter(row => {
-      const d = new Date(row[0] + 'T00:00:00');
-      return d >= yearAgo && d <= now;
-    });
+    syncing = false;
+    // Clear message after 3 seconds
+    setTimeout(() => { syncMessage = ''; }, 3000);
   }
-
-function getTrendline(data: {x: number, y: number}[], lift?: string) {
-  if (data.length < 2) {
-    if (lift) trendlineEquations[lift] = '';
-    return [];
-  }
-  const n = data.length;
-  const sumX = data.reduce((a, p) => a + p.x, 0);
-  const sumY = data.reduce((a, p) => a + p.y, 0);
-  const sumXY = data.reduce((a, p) => a + p.x * p.y, 0);
-  const sumXX = data.reduce((a, p) => a + p.x * p.x, 0);
-  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-  const intercept = (sumY - slope * sumX) / n;
-  // Calculate R^2
-  const meanY = sumY / n;
-  let ssTot = 0, ssRes = 0;
-  for (const p of data) {
-    const yPred = slope * p.x + intercept;
-    ssTot += (p.y - meanY) ** 2;
-    ssRes += (p.y - yPred) ** 2;
-  }
-  const r2 = ssTot === 0 ? 1 : 1 - ssRes / ssTot;
-  // Show slope per 30 days (month)
-  const slopePerMonth = slope * 86400000 * 30;
-  if (lift) {
-    trendlineEquations[lift] = `a = ${slopePerMonth.toFixed(2)} /mo, R² = ${r2.toFixed(2)}`;
-  }
-  const x0 = data[0].x;
-  const x1 = data[data.length - 1].x;
-  return [
-    { x: x0, y: slope * x0 + intercept },
-    { x: x1, y: slope * x1 + intercept }
-  ];
-}
-
-  afterUpdate(() => {
-    for (const lift of selectedLifts) {
-      const canvas = document.getElementById('chart-' + lift) as HTMLCanvasElement;
-      if (!canvas) continue;
-      if (chartInstances[lift]) {
-        chartInstances[lift].destroy();
-        delete chartInstances[lift];
-      }
-      const dataRows = get12MonthData(lift);
-      if (dataRows.length === 0) {
-        trendlineEquations[lift] = '';
-        continue;
-      }
-      const points = dataRows.map(row => ({
-        x: new Date(row[0] + 'T00:00:00').getTime(),
-        y: row[8]
-      }));
-      const trend = getTrendline(points, lift);
-      chartInstances[lift] = new Chart(canvas, {
-        type: 'scatter',
-        data: {
-          datasets: [
-            {
-              label: '6RM',
-              data: points,
-              backgroundColor: '#2563eb',
-              pointRadius: 3,
-            },
-            ...(trend.length === 2
-              ? [{
-                  type: 'line' as const,
-                  label: 'Trend',
-                  data: trend,
-                  borderColor: '#f59e42',
-                  borderWidth: 2,
-                  fill: false,
-                  pointRadius: 0,
-                  tension: 0,
-                  order: 1,
-                }]
-              : [])
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            title: { display: false }
-          },
-          scales: {
-            x: {
-              type: 'time',
-              time: { unit: 'month' },
-              title: { display: true, text: 'Date' }
-            },
-            y: {
-              title: { display: true, text: '6RM' },
-              beginAtZero: true
-            }
-          }
-        }
-      });
-    }
-  });
-
-  onDestroy(() => {
-    for (const k in chartInstances) chartInstances[k].destroy();
-  });
 </script>
 
-
-<div class="mb-4 flex items-center gap-4">
-  <button class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 cursor-pointer disabled:opacity-50" on:click={syncGarmin} disabled={syncing}>
-    {syncing ? 'Syncing...' : 'Sync Garmin'}
+<div class="flex h-screen overflow-hidden">
+  <!-- Mobile Menu Button -->
+  <button 
+    class="md:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg border border-gray-200"
+    on:click={() => sidebarOpen = !sidebarOpen}
+  >
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      {#if sidebarOpen}
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+      {:else}
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      {/if}
+    </svg>
   </button>
-  <div class="flex-1 min-w-0">
-    {#if syncMessage}
-      <span class="text-sm block">{syncMessage}</span>
-    {/if}
-    {#if syncRawResponse !== null}
-      <pre class="text-xs bg-gray-100 rounded p-2 mt-1 overflow-x-auto max-w-full whitespace-pre-wrap">{syncRawResponse}</pre>
-    {/if}
-  </div>
-</div>
-<div class="w-full max-w-full overflow-x-scroll">
-<table class="w-full text-sm mb-6 border">
-  <thead>
-    <tr class="bg-gray-200">
-      <th class="border px-14 py-1">Metric</th>
-      {#each summaryTable as row}
-        <th class="border px-2 py-1" title={liftNames[row.lift] || row.lift}>
-          {liftNames[row.lift] || row.lift}
-        </th>
-      {/each}
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td class="border px-2 py-1 font-semibold">6RM Avg Last 2w</td>
-      {#each summaryTable as row}
-        <td class="border px-2 py-1 text-center font-bold">{row.avg6RM_recent.toFixed(0)}</td>
-      {/each}
-    </tr>
-    <tr>
-      <td class="border px-2 py-1 font-semibold">2-wk Δ%</td>
-      {#each summaryTable as row}
-        <td class="border px-2 py-1 text-center">
-          <span class={row.pct_increase > 0 ? 'text-green-600 font-bold' : row.pct_increase < 0 ? 'text-red-600 font-semibold' : ''}>
-            {row.pct_increase.toFixed(1)}%
-          </span>
-        </td>
-      {/each}
-    </tr>
-    <tr>
-      <td class="border px-2 py-1 font-semibold">6mo Δ%</td>
-      {#each summaryTable as row}
-        <td class="border px-2 py-1 text-center">
-          <span class={row.pct_increase_6mo > 0 ? 'text-green-600 font-bold' : row.pct_increase_6mo < 0 ? 'text-red-600 font-semibold' : ''}>
-            {row.pct_increase_6mo.toFixed(1)}%
-          </span>
-        </td>
-      {/each}
-    </tr>
-    <tr>
-      <td class="border px-2 py-1 font-semibold">6mo Δ</td>
-      {#each summaryTable as row}
-        <td class="border px-2 py-1 text-center">
-          <span class={row.raw_increase_6mo > 0 ? 'text-green-600 font-bold' : row.raw_increase_6mo < 0 ? 'text-red-600 font-semibold' : ''}>
-            {row.raw_increase_6mo.toFixed(2)}
-          </span>
-        </td>
-      {/each}
-    </tr>
-    <tr>
-      <td class="border px-2 py-1 font-semibold">6RM Avg 6mo Ago</td>
-      {#each summaryTable as row}
-        <td class="border px-2 py-1 text-center">{row.avg6RM_6mo_ago.toFixed(0)}</td>
-      {/each}
-    </tr>
-  </tbody>
-</table>
-</div>
-<div class="flex w-full max-w-full overflow-x-scroll">
-{#each Object.entries(results) as [lift, entries]}
-    <div class="flex flex-wrap px-2 mt-8">
-        <h3 class="text-base font-semibold mb-1">{liftNames[lift] || lift}</h3>
-        {#if trendlineEquations[lift]}
-          <div class="text-xs mb-2 text-gray-600">{trendlineEquations[lift]}</div>
-        {/if}
-        <div style="height:260px;width:100%">
-          <canvas id={'chart-' + lift}></canvas>
-        </div>
+
+  <!-- Overlay for mobile -->
+  {#if sidebarOpen}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div 
+      class="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+      on:click={() => sidebarOpen = false}
+    ></div>
+  {/if}
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-white border-r border-gray-200 p-4 flex flex-col fixed md:static h-full z-40 transform transition-transform duration-300 {sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}">
+    <div class="mb-8">
+      <h1 class="text-xl font-bold mb-1">a0a7 <span class="text-sm font-normal text-gray-500"></span></h1>
+      <p class="text-sm text-gray-600">hello ur a bum</p>
     </div>
-{/each}
+    
+    <nav class="space-y-1 flex-1">
+      <button 
+        class="w-full text-left px-3 py-2 rounded-md flex items-center gap-3 {currentView === 'home' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}"
+        on:click={() => { currentView = 'home'; sidebarOpen = false; }}
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+        </svg>
+        Home
+      </button>
+      
+      <button 
+        class="w-full text-left px-3 py-2 rounded-md flex items-center gap-3 {currentView === 'calendar' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}"
+        on:click={() => currentView = 'calendar'}
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        Calendar
+      </button>
+      
+      <button 
+        class="w-full text-left px-3 py-2 rounded-md flex items-center gap-3 {currentView === 'trends' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}"
+        on:click={() => { currentView = 'trends'; sidebarOpen = false; }}
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+        </svg>
+        Trends
+      </button>
+      
+      <button 
+        class="w-full text-left px-3 py-2 rounded-md flex items-center gap-3 {currentView === 'summary' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}"
+        on:click={() => { currentView = 'summary'; sidebarOpen = false; }}
+      >
+        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z"/><path d="m2.5 21.5 1.4-1.4"/><path d="m20.1 3.9 1.4-1.4"/><path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z"/><path d="m9.6 14.4 4.8-4.8"/></svg>
+        Progression
+      </button>
+      
+      <button 
+        class="w-full text-left px-3 py-2 rounded-md flex items-center gap-3 {currentView === 'table' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}"
+        on:click={() => { currentView = 'table'; sidebarOpen = false; }}
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+        Summary Table
+      </button>
+
+      
+    </nav>
+    
+    <!-- Sync Button at Bottom -->
+    <div class="mt-auto pt-4 border-t border-gray-200">
+      <button 
+        class="w-full px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+        on:click={syncGarmin} 
+        disabled={syncing}
+      >
+        {syncing ? 'Syncing...' : 'Sync Garmin'}
+      </button>
+      {#if syncMessage}
+        <div class="text-xs text-center mt-2 text-gray-600">{syncMessage}</div>
+      {/if}
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 overflow-auto p-4 md:p-6 bg-gray-50 md:ml-0">
+    {#if currentView === 'home'}
+      <HomePage {activities} />
+    {:else if currentView === 'summary'}
+      <SummaryPage {activities} {selectedLifts} {liftNames} {weightMultipliers} {getWeightMultiplier} />
+    {:else if currentView === 'calendar'}
+      <CalendarPage {activities} {splitConfig} {determineSplitDay} />
+    {:else if currentView === 'trends'}
+      <TrendsPage {activities} />
+    {:else if currentView === 'table'}
+      <TablePage {activities} {selectedLifts} {liftNames} {getWeightMultiplier} />
+    {/if}
+  </main>
 </div>
-
-
-{#each Object.entries(results) as [lift, entries]}
-  <details class="mb-4">
-    <summary class="cursor-pointer font-semibold">{liftNames[lift] || lift}</summary>
-    <table class="w-full text-sm mt-2 border">
-      <thead>
-        <tr class="bg-gray-200">
-          <th class="border px-2 py-1">Date</th>
-          <th class="border px-2 py-1">Volume (kg)</th>
-          <th class="border px-2 py-1">Reps</th>
-          <th class="border px-2 py-1">Sets</th>
-          <th class="border px-2 py-1">Volume (lbs)</th>
-          <th class="border px-2 py-1">Avg Wt (lbs)</th>
-          <th class="border px-2 py-1">Avg Reps</th>
-          <th class="border px-2 py-1">Lombardi 1RM</th>
-          <th class="border px-2 py-1">Lombardi 6RM</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each entries as row}
-          <tr>
-            {#each row as cell}
-              <td class="border px-2 py-1 text-center">{typeof cell === 'number' ? cell.toFixed(2) : cell}</td>
-            {/each}
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-  </details>
-{/each}
-
